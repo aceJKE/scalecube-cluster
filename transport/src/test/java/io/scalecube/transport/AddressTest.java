@@ -1,8 +1,11 @@
 package io.scalecube.transport;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
+
+import java.util.List;
 
 public class AddressTest extends BaseTest {
 
@@ -24,5 +27,14 @@ public class AddressTest extends BaseTest {
     Address address = Address.from("host:1111");
     assertEquals(1111, address.port());
     assertEquals("host", address.host());
+  }
+
+  @Test
+  public void testParseHostPortRange() throws Exception {
+    List<Address> addresses = Address.fromRange("localhost:5810..5812");
+    assertEquals(3, addresses.size());
+    assertTrue(addresses.contains(Address.create("localhost", 5810)));
+    assertTrue(addresses.contains(Address.create("localhost", 5811)));
+    assertTrue(addresses.contains(Address.create("localhost", 5812)));
   }
 }

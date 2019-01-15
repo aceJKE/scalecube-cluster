@@ -2,6 +2,9 @@ package io.scalecube.transport;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -10,6 +13,7 @@ import reactor.core.Exceptions;
 public final class Address {
 
   private static final Pattern ADDRESS_FORMAT = Pattern.compile("(?<host>^.*):(?<port>\\d+$)");
+  private static final Pattern ADDRESS_RANGE_FORMAT = Pattern.compile("(?<host>^.*):(?<ports>\\d+(\\.\\.)?\\d+$)");
 
   private String host;
   private int port;
@@ -48,14 +52,53 @@ public final class Address {
       throw new IllegalArgumentException("can't parse host from: " + hostandport);
     }
 
+    int port = parsePort(hostandport, matcher.group(2));
+    return new Address(host, port);
+  }
+
+  private static int parsePort(String source, String portCandidate) {
     int port;
     try {
-      port = Integer.parseInt(matcher.group(2));
+      port = Integer.parseInt(portCandidate);
     } catch (NumberFormatException ex) {
-      throw new IllegalArgumentException("can't parse port from: " + hostandport, ex);
+      throw new IllegalArgumentException("can't parse port from: " + source, ex);
     }
+    return port;
+  }
 
-    return new Address(host, port);
+  /**
+   * Parses given host:port..port string to create range of Address instances.
+
+   * @param hostAndPortRange must come in from {@code host:port..port}
+   */
+  public static List<Address> fromRange(String hostAndPortRange) {
+    if (hostAndPortRange == null || hostAndPortRange.isEmpty()) {
+      throw new IllegalArgumentException("");
+    }
+    Matcher matcher = ADDRESS_RANGE_FORMAT.matcher(hostAndPortRange);
+    if (!matcher.find()) {
+      throw new IllegalArgumentException("can't parse range of addresses from: " + hostAndPortRange);
+    }
+    String host = matcher.group(1);
+    if (host == null || host.isEmpty()) {
+      throw new IllegalArgumentException("can't parse host from: " + hostAndPortRange);
+    }
+    String portGroup = matcher.group(2);
+    if (portGroup.contains("..")) {
+      String[] ports = portGroup.split("\\.\\.");
+      int left = parsePort(hostAndPortRange, ports[0]);
+      int right = parsePort(hostAndPortRange, ports[1]);
+      if (left > right) {
+        throw new IllegalArgumentException("left port must be lower then right" + hostAndPortRange);
+      }
+      List<Address> result = new ArrayList<>();
+      for (int port = left; port <= right; port++) {
+        result.add(new Address(host, port));
+      }
+      return result;
+    } else {
+      return Collections.singletonList(new Address(host, parsePort(hostAndPortRange, portGroup)));
+    }
   }
 
   /** Creates address from host and port. */
